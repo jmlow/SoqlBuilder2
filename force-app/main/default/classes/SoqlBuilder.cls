@@ -21,6 +21,21 @@ global with sharing class SoqlBuilder implements ISoqlable {
 		//Grouping Operator
 		GROUPING //GROUPING()
 	}
+	enum FieldDateOperator {
+		CALENDAR_MONTH, //CALENDAR_MONTH()
+		CALENDAR_QUARTER, //CALENDAR_QUARTER()
+		CALENDAR_YEAR, //CALENDAR_YEAR()
+		DAY_IN_MONTH, //DAY_IN_MONTH()
+		DAY_IN_WEEK, //DAY_IN_WEEK()
+		DAY_IN_YEAR, //DAY_IN_YEAR()
+		DAY_ONLY, //DAY_ONLY()
+		FISCAL_MONTH, //FISCAL_MONTH()
+		FISCAL_QUARTER, //FISCAL_QUARTER()
+		FISCAL_YEAR, //FISCAL_YEAR()
+		HOUR_IN_DAY, //HOUR_IN_DAY()
+		WEEK_IN_MONTH, //WEEK_IN_MONTH()
+		WEEK_IN_YEAR //WEEK_IN_YEAR()
+	}
 	enum ConditionOperator {
 		//Field Operators
 		EQUALS, //=
@@ -48,6 +63,10 @@ global with sharing class SoqlBuilder implements ISoqlable {
 		MY_TERRITORY, //My_Territory
 		MY_TEAM_TERRITORY, //My_Team_Territory
 		TEAM //Team
+	}
+	enum GroupByModifier {
+		ROLLUP, //ROLLUP
+		CUBE //CUBE
 	}
 	enum NullsOrder {
 		NULLS_FIRST, //NULLS FIRST
@@ -79,6 +98,8 @@ global with sharing class SoqlBuilder implements ISoqlable {
 
 	//Classes
 	class Field implements ISoqlable{
+		public Boolean convertCurrency {get; private set;} {convertCurrency = false;}
+		public Boolean format {get; private set;} {format = false;}
 		public String name {get; set;} {name = null;}
 		public String alias {get; set;} {alias = null;}
 		public FieldOperator operator {get; private set;} {operator = null;}
@@ -94,6 +115,8 @@ global with sharing class SoqlBuilder implements ISoqlable {
 		public Field sum() {this.operator = FieldOperator.SUM; return this;}
 		public Field toLabel() {this.operator = FieldOperator.TO_LABEL; return this;}
 		public Field grouping() {this.operator = FieldOperator.GROUPING; return this;}
+		public Field convertCurrency(Boolean value) {this.convertCurrency = value; return this;}
+		public Field format(Boolean value) {this.format = value; return this;}
 		public String toSoql() {return this.toSoql(null);}
 		public String toSoql(SoqlOptions options) {
 			if(options == null) options = SoqlOptions.DEFAULT_OPTIONS;
@@ -108,6 +131,8 @@ global with sharing class SoqlBuilder implements ISoqlable {
 				when GROUPING {soql = 'GROUPING(' + this.name + ')';}
 				when else {soql = this.name;}
 			}
+			if(this.convertCurrency) soql = 'convertCurrency(' + soql + ')';
+			if(this.format) soql = 'FORMAT(' + soql + ')';
 			if(this.alias != null) soql += ' ' + this.alias;
 			return soql;
 		}
@@ -115,6 +140,13 @@ global with sharing class SoqlBuilder implements ISoqlable {
 	class Fromx implements ISoqlable {
 		public String fromObject {get; set;}
 		public FilterScope myFilterScope {get; private set;} {myFilterScope = null;}
+		public Fromx delegated() {this.myFilterScope = FilterScope.DELEGATED; return this;}
+		public Fromx everything() {this.myFilterScope = FilterScope.EVERYTHING; return this;}
+		public Fromx mine() {this.myFilterScope = FilterScope.MINE; return this;}
+		public Fromx mineAndMyGroups() {this.myFilterScope = FilterScope.MINEANDMYGROUPS; return this;}
+		public Fromx myTerritory() {this.myFilterScope = FilterScope.MY_TERRITORY; return this;}
+		public Fromx myTeamTerritory() {this.myFilterScope = FilterScope.MY_TEAM_TERRITORY; return this;}
+		public Fromx team() {this.myFilterScope = FilterScope.TEAM; return this;}
 		public String toSoql() {return this.toSoql(null);}
 		public String toSoql(SoqlOptions options) {
 			if(options == null) options = SoqlOptions.DEFAULT_OPTIONS;
@@ -129,6 +161,24 @@ global with sharing class SoqlBuilder implements ISoqlable {
 				when TEAM {soql += ' USING SCOPE Team';}
 				when else {}
 			}
+			return soql;
+		}
+	}
+	class GroupBy implements ISoqlable {
+		public GroupByModifier modifier {get; private set;} {modifier = null;}
+		public List<Field> myFields {get; private set;} {myFields = new List<Field>();}
+		public GroupBy rollup() {this.modifier = GroupByModifier.ROLLUP; return this;}
+		public GroupBy cube() {this.modifier = GroupByModifier.CUBE; return this;}
+		public String toSoql() {return this.toSoql(null);}
+		public String toSoql(SoqlOptions options) {
+			if(options == null) options = SoqlOptions.DEFAULT_OPTIONS;
+			String soql = 'GROUP BY ';
+			switch on modifier {
+				when ROLLUP {soql += 'ROLLUP ';}
+				when CUBE {soql += 'CUBE ';}
+				when else {}
+			}
+			//TODO: Implement this
 			return soql;
 		}
 	}
@@ -249,7 +299,7 @@ global with sharing class SoqlBuilder implements ISoqlable {
 		public String toSoql(SoqlOptions options) {
 			if(options == null) options = SoqlOptions.DEFAULT_OPTIONS;
 			String soql;
-			//TODO: Implement soql string creation
+			//TODO: Implement this
 			return soql;
 		}
 	}
@@ -263,25 +313,37 @@ global with sharing class SoqlBuilder implements ISoqlable {
 	//Variables
 	private List<Field> selectx = new List<Field>();
 	private Fromx fromx = null;
+	private GroupBy groupBy = null;
 	private List<OrderBy> orderBy = new List<OrderBy>();
 	private Integer limitx = null;
 	private Integer offsetx = null;
 	private Boolean forView = false;
 	private Boolean forReference = false;
 	private Boolean forUpdate = false;
+	private Boolean updateTracking = false;
+	private Boolean updateViewStat = false;
 
 
 	//Functions
 	public SoqlBuilder selectx(Field field) {this.selectx.add(field); return this;}
 	public SoqlBuilder selectx(String field) {selectx(new Field(field)); return this;}
+
+	public SoqlBuilder forView(Boolean value) {this.forView = value; return this;}
+	public SoqlBuilder forReference(Boolean value) {this.forReference = value; return this;}
+	public SoqlBuilder forUpdate(Boolean value) {this.forUpdate = value; return this;}
+	public SoqlBuilder updateTracking(Boolean value) {this.updateTracking = value; return this;}
+	public SoqlBuilder updateViewStat(Boolean value) {this.updateViewStat = value; return this;}
 	public String toSoql() {return this.toSoql(null);}
 	public String toSoql(SoqlOptions options) {
 		if(options == null) options = SoqlOptions.DEFAULT_OPTIONS;
 		String soql;
-		//TODO: Implement soql string creation
-		if(forView) soql += ' FOR VIEW';
-		if(forReference) soql += ' FOR REFERENCE';
-		if(forUpdate) soql += ' FOR UPDATE';
+		//TODO: Implement this
+		if(this.forView) soql += ' FOR VIEW ';
+		if(this.forReference) soql += ' FOR REFERENCE ';
+		if(this.forUpdate) soql += ' FOR UPDATE ';
+		if(this.updateTracking) soql += ' UPDATE TRACKING ';
+		if(this.updateViewStat) soql += ' UPDATE VIEWSTAT ';
+		soql = soql.trim();
 		return soql;
 	}
 }
