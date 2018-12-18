@@ -140,6 +140,7 @@ global with sharing class SoqlBuilder implements ISoqlable {
 	class Fromx implements ISoqlable {
 		public String fromObject {get; set;}
 		public FilterScope myFilterScope {get; private set;} {myFilterScope = null;}
+		public Fromx(String fromObject) {this.fromObject = fromObject;}
 		public Fromx delegated() {this.myFilterScope = FilterScope.DELEGATED; return this;}
 		public Fromx everything() {this.myFilterScope = FilterScope.EVERYTHING; return this;}
 		public Fromx mine() {this.myFilterScope = FilterScope.MINE; return this;}
@@ -277,7 +278,7 @@ global with sharing class SoqlBuilder implements ISoqlable {
 			if(options == null) options = SoqlOptions.DEFAULT_OPTIONS;
 			String soql = '';
 			if(this.notClause) soql += 'NOT ';
-			soql += this.myField + ' ' + opToString(this.operator) + ' ';
+			soql += this.myField.toSoql() + ' ' + opToString(this.operator) + ' ';
 			String literalValue = SoqlUtils.toLiteral(value);
 			if(this.value != null && this.value instanceOf String && this.operator == ConditionOperator.LIKEx) soql += options.wildcardStringsInLikeOperators(literalValue);
 			soql += literalValue;
@@ -327,6 +328,7 @@ global with sharing class SoqlBuilder implements ISoqlable {
 	//Functions
 	public SoqlBuilder selectx(Field field) {this.selectx.add(field); return this;}
 	public SoqlBuilder selectx(String field) {selectx(new Field(field)); return this;}
+	public SoqlBuilder fromx(String fromObject) {this.fromx = new Fromx(fromObject); return this;}
 
 	public SoqlBuilder forView(Boolean value) {this.forView = value; return this;}
 	public SoqlBuilder forReference(Boolean value) {this.forReference = value; return this;}
@@ -336,7 +338,13 @@ global with sharing class SoqlBuilder implements ISoqlable {
 	public String toSoql() {return this.toSoql(null);}
 	public String toSoql(SoqlOptions options) {
 		if(options == null) options = SoqlOptions.DEFAULT_OPTIONS;
-		String soql;
+		String soql = 'SELECT ';
+		for(Integer i = 0; i < selectx.size();) {
+			soql += selectx[i].toSoql();
+			i++;
+			if(i < selectx.size()) soql += ', ';
+		}
+		soql += ' ' + this.fromx.toSoql();
 		//TODO: Implement this
 		if(this.forView) soql += ' FOR VIEW ';
 		if(this.forReference) soql += ' FOR REFERENCE ';
