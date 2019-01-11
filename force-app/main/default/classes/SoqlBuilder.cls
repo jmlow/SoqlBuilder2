@@ -175,28 +175,34 @@ global with sharing class SoqlBuilder implements ISoqlable {
 			if(options == null) options = SoqlOptions.DEFAULT_OPTIONS;
 			String soql = 'GROUP BY ';
 			switch on modifier {
-				when ROLLUP {soql += 'ROLLUP ';}
-				when CUBE {soql += 'CUBE ';}
+				when ROLLUP {soql += 'ROLLUP (';}
+				when CUBE {soql += 'CUBE (';}
 				when else {}
 			}
-			//TODO: Implement this
+			for(Integer i = 0; i < myFields.size(); i++) {
+				Field myField = myFields[i];
+				if(myField.convertCurrency || myField.format || myField.alias != null || myField.operator != null) throw new IllegalStateException('Group By Fields cannot have aliases or operators!');
+				soql += myFields[i].toSoql(options);
+				if(i < (myFields.size() - 1)) soql += ', ';
+			}
+			if(modifier == GroupByModifier.ROLLUP || modifier == GroupByModifier.CUBE) soql += ')';
 			return soql;
 		}
 	}
-	class OrderBy implements ISoqlable {
+	class OrderByField implements ISoqlable {
 		public Field myField {get; set;}
 		public SortOrder mySortOrder {get; private set;}
 		public NullsOrder myNullsOrder {get; private set;}
-		public OrderBy(Field field) {
+		public OrderByField(Field field) {
 			this.myField = field;
 			this.mySortOrder = SortOrder.ASCENDING;
 			this.myNullsOrder = NullsOrder.NULLS_FIRST;
 		}
-		public OrderBy(String field) {this(new Field(field));}
-		public OrderBy ascending() {this.mySortOrder = SortOrder.ASCENDING; return this;}
-		public OrderBy descending() {this.mySortOrder = SortOrder.DESCENDING; return this;}
-		public OrderBy nullsFirst() {this.myNullsOrder = NullsOrder.NULLS_FIRST; return this;}
-		public OrderBy nullsLast() {this.myNullsOrder = NullsOrder.NULLS_LAST; return this;}
+		public OrderByField(String field) {this(new Field(field));}
+		public OrderByField ascending() {this.mySortOrder = SortOrder.ASCENDING; return this;}
+		public OrderByField descending() {this.mySortOrder = SortOrder.DESCENDING; return this;}
+		public OrderByField nullsFirst() {this.myNullsOrder = NullsOrder.NULLS_FIRST; return this;}
+		public OrderByField nullsLast() {this.myNullsOrder = NullsOrder.NULLS_LAST; return this;}
 		public String toSoql() {return this.toSoql(null);}
 		public String toSoql(SoqlOptions options) {
 			if(options == null) options = SoqlOptions.DEFAULT_OPTIONS;
@@ -315,7 +321,7 @@ global with sharing class SoqlBuilder implements ISoqlable {
 	private List<Field> selectx = new List<Field>();
 	private Fromx fromx = null;
 	private GroupBy groupBy = null;
-	private List<OrderBy> orderBy = new List<OrderBy>();
+	private List<OrderByField> orderBy = new List<OrderByField>();
 	private Integer limitx = null;
 	private Integer offsetx = null;
 	private Boolean forView = false;
