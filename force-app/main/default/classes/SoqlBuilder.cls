@@ -164,11 +164,19 @@ global with sharing class SoqlBuilder implements ISoqlable {
 		}
 	}
 	class Havingx implements ISoqlable {
+		public FieldCondition myFieldCondition {get; private set;}
 		public String toSoql() {return this.toSoql(null);}
 		public String toSoql(SoqlOptions options) {
 			if(options == null) options = SoqlOptions.DEFAULT_OPTIONS;
+			switch on myFieldCondition.myField.operator {
+				when null {throw IllegalArgumentException('Error!');}
+				when TO_LABEL {throw IllegalArgumentException('Error!');}
+				when GROUPING {throw IllegalArgumentException('Error!');}
+				when else {
+					//TODO: Implement this
+				}
+			}
 			String soql;
-			//TODO: Implement this
 			return soql;
 		}
 	}
